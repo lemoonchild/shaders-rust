@@ -26,14 +26,17 @@ pub struct Uniforms {
     projection_matrix: Mat4,
     viewport_matrix: Mat4,
     time: u32,
-    noise: FastNoiseLite
+    noise: FastNoiseLite,
+    current_shader: u8, 
 }
 
-fn create_noise() -> FastNoiseLite {
-    // create_cloud_noise() 
-    // create_cell_noise()
-    // create_ground_noise()
-    create_lava_noise()
+fn create_noise(current_shader: u8) -> FastNoiseLite {
+    match current_shader {
+        1 => create_cloud_noise(),
+        2 => create_cell_noise(),
+        3 => create_lava_noise(),
+        _ => create_ground_noise(),  
+    }
 }
 
 fn create_cloud_noise() -> FastNoiseLite {
@@ -186,7 +189,7 @@ fn main() {
 
     let mut framebuffer = Framebuffer::new(framebuffer_width, framebuffer_height);
     let mut window = Window::new(
-        "Rust Graphics - Renderer Example",
+        "Rust Graphics - Planet Shader - Press 1-7 to switch",
         window_width,
         window_height,
         WindowOptions::default(),
@@ -210,11 +213,10 @@ fn main() {
         Vec3::new(0.0, 1.0, 0.0)
     );
 
-    let obj = Obj::load("assets/models/model.obj").expect("Failed to load obj");
+    let obj = Obj::load("assets/models/sphere.obj").expect("Failed to load obj");
     let vertex_arrays = obj.get_vertex_array(); 
     let mut time = 0;
 
-    let noise = create_noise();
     let projection_matrix = create_perspective_matrix(window_width as f32, window_height as f32);
     let viewport_matrix = create_viewport_matrix(framebuffer_width as f32, framebuffer_height as f32);
     let mut uniforms = Uniforms { 
@@ -223,10 +225,11 @@ fn main() {
         projection_matrix, 
         viewport_matrix, 
         time: 0, 
-        noise
+        noise: create_noise(1),
+        current_shader: 1,
     };
 
-    while window.is_open() {
+    while window.is_open() && !window.is_key_down(Key::Escape) {
         if window.is_key_down(Key::Escape) {
             break;
         }
@@ -241,11 +244,20 @@ fn main() {
         uniforms.view_matrix = create_view_matrix(camera.eye, camera.center, camera.up);
         uniforms.time = time;
         framebuffer.set_current_color(0xFFDDDD);
+
+        if window.is_key_down(Key::Key1) {
+            uniforms.current_shader = 1;
+            uniforms.noise = create_noise(uniforms.current_shader);  
+        } else if window.is_key_down(Key::Key2) {
+            uniforms.current_shader = 2;
+            uniforms.noise = create_noise(uniforms.current_shader);
+        }
+
         render(&mut framebuffer, &uniforms, &vertex_arrays);
 
         window
-            .update_with_buffer(&framebuffer.buffer, framebuffer_width, framebuffer_height)
-            .unwrap();
+        .update_with_buffer(&framebuffer.buffer, framebuffer_width, framebuffer_height)
+        .unwrap();
     }
 }
 

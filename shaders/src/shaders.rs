@@ -47,13 +47,13 @@ pub fn vertex_shader(vertex: &Vertex, uniforms: &Uniforms) -> Vertex {
 }
 
 pub fn fragment_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
-  // random_color_shader(fragment, uniforms)
-  // black_and_white(fragment, uniforms)
-  dalmata_shader(fragment, uniforms)
-  // cloud_shader(fragment, uniforms)
-  // cellular_shader(fragment, uniforms)
-  // cracked_ground_shader(fragment, uniforms)
-  // lava_shader(fragment, uniforms)
+  match uniforms.current_shader {
+      1 => cloud_shader(fragment, uniforms),
+      2 => cellular_shader(fragment, uniforms),
+      3 => lava_shader(fragment, uniforms),
+      // Continúa con otros shaders según sea necesario
+      _ => Color::new(0, 0, 0), // Color por defecto si no hay un shader definido
+  }
 }
 
 fn random_color_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
