@@ -25,7 +25,7 @@ pub struct Uniforms {
     view_matrix: Mat4,
     projection_matrix: Mat4,
     viewport_matrix: Mat4,
-    time: f32,
+    time: u32,
     noise: FastNoiseLite,
     cloud_noise: FastNoiseLite, 
     current_shader: u8, 
@@ -33,17 +33,16 @@ pub struct Uniforms {
 
 fn create_noise(current_shader: u8) -> FastNoiseLite {
     match current_shader {
-        1 => create_earth_like_noise(),
-        2 => create_lava_noise(),
-        _ => create_ground_noise(),  
+        1 => create_earth_noise(),
+        2 => create_cloud_noise(),
+        _ => create_cloud_noise(),  
     }
 }
 
-fn create_earth_like_noise() -> FastNoiseLite {
+fn create_earth_noise() -> FastNoiseLite {
     let mut noise = FastNoiseLite::with_seed(1337);
     noise.set_noise_type(Some(NoiseType::OpenSimplex2S));
 
-    // Usar FBm (Fractal Brownian Motion) para una textura más compleja
     noise.set_fractal_type(Some(FractalType::Ridged));
     noise.set_fractal_octaves(Some(5)); // Octavas para mayor detalle
     noise.set_fractal_lacunarity(Some(3.0)); // Lacunaridad para escalado de frecuencia
@@ -54,48 +53,13 @@ fn create_earth_like_noise() -> FastNoiseLite {
 }
 
 fn create_cloud_noise() -> FastNoiseLite {
-    let mut noise = FastNoiseLite::with_seed(42);  // Diferente semilla para variación
-    noise.set_noise_type(Some(NoiseType::Perlin)); // Ruido de Perlin para texturas suaves
+    let mut noise = FastNoiseLite::with_seed(40);  
+    noise.set_noise_type(Some(NoiseType::Perlin)); 
     noise.set_fractal_type(Some(FractalType::FBm));
-    noise.set_fractal_octaves(Some(1));  // Menos octavas para menos detalles
-    noise.set_fractal_lacunarity(Some(2.0));
+    noise.set_fractal_octaves(Some(2));  // Menos octavas para menos detalles
+    noise.set_fractal_lacunarity(Some(3.0));
     noise.set_fractal_gain(Some(0.5));
     noise.set_frequency(Some(0.01));  // Baja frecuencia para nubes grandes y suaves
-    noise
-}
-
-fn create_cell_noise() -> FastNoiseLite {
-    let mut noise = FastNoiseLite::with_seed(1337);
-    noise.set_noise_type(Some(NoiseType::Cellular));
-    noise.set_frequency(Some(0.1));
-    noise
-}
-
-fn create_ground_noise() -> FastNoiseLite {
-    let mut noise = FastNoiseLite::with_seed(1337);
-    
-    // Use FBm fractal type to layer multiple octaves of noise
-    noise.set_noise_type(Some(NoiseType::Cellular)); // Cellular noise for cracks
-    noise.set_fractal_type(Some(FractalType::FBm));  // Fractal Brownian Motion
-    noise.set_fractal_octaves(Some(5));              // More octaves = more detail
-    noise.set_fractal_lacunarity(Some(3.0));         // Lacunarity controls frequency scaling
-    noise.set_fractal_gain(Some(0.5));               // Gain controls amplitude scaling
-    noise.set_frequency(Some(0.05));                 // Lower frequency for larger features
-
-    noise
-}
-
-fn create_lava_noise() -> FastNoiseLite {
-    let mut noise = FastNoiseLite::with_seed(42);
-    
-    // Use FBm for multi-layered noise, giving a "turbulent" feel
-    noise.set_noise_type(Some(NoiseType::Perlin));  // Perlin noise for smooth, natural texture
-    noise.set_fractal_type(Some(FractalType::FBm)); // FBm for layered detail
-    noise.set_fractal_octaves(Some(6));             // High octaves for rich detail
-    noise.set_fractal_lacunarity(Some(2.0));        // Higher lacunarity = more contrast between layers
-    noise.set_fractal_gain(Some(0.5));              // Higher gain = more influence of smaller details
-    noise.set_frequency(Some(0.002));                // Low frequency = large features
-    
     noise
 }
 
@@ -160,7 +124,7 @@ fn create_viewport_matrix(width: f32, height: f32) -> Mat4 {
     )
 }
 
-fn render(framebuffer: &mut Framebuffer, uniforms: &Uniforms, vertex_array: &[Vertex], time: f32) {
+fn render(framebuffer: &mut Framebuffer, uniforms: &Uniforms, vertex_array: &[Vertex], time: u32) {
     // Vertex Shader Stage
     let mut transformed_vertices = Vec::with_capacity(vertex_array.len());
     for vertex in vertex_array {
@@ -235,7 +199,7 @@ fn main() {
     let obj = Obj::load("assets/models/sphere.obj").expect("Failed to load obj");
     let vertex_arrays = obj.get_vertex_array(); 
     let mut last_frame_time = Instant::now();
-    let mut time = 0.0;
+    let mut time = 0;
 
     let projection_matrix = create_perspective_matrix(window_width as f32, window_height as f32);
     let viewport_matrix = create_viewport_matrix(framebuffer_width as f32, framebuffer_height as f32);
@@ -244,7 +208,7 @@ fn main() {
         view_matrix: Mat4::identity(), 
         projection_matrix, 
         viewport_matrix, 
-        time: 0.0, 
+        time: 0, 
         noise: create_noise(1),
         cloud_noise: create_cloud_noise(),
         current_shader: 1,
@@ -253,7 +217,7 @@ fn main() {
     while window.is_open() && !window.is_key_down(Key::Escape) {
         let delta_time = last_frame_time.elapsed();
         last_frame_time = Instant::now();
-        time += delta_time.as_secs_f32();
+        time += delta_time.as_millis() as u32;
 
         handle_input(&window, &mut camera);
 
