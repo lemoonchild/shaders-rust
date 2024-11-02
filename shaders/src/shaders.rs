@@ -1,4 +1,6 @@
-use nalgebra_glm::{Vec3, Vec4, Mat3, mat4_to_mat3};
+use core::time;
+
+use nalgebra_glm::{Vec3, Vec4, Mat3, mat4_to_mat3, dot, normalize};
 use crate::vertex::Vertex;
 use crate::Uniforms;
 use crate::fragment::Fragment;
@@ -46,13 +48,59 @@ pub fn vertex_shader(vertex: &Vertex, uniforms: &Uniforms) -> Vertex {
   }
 }
 
-pub fn fragment_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
+pub fn fragment_shader(fragment: &Fragment, uniforms: &Uniforms, time: f32) -> Color {
   match uniforms.current_shader {
-      1 => cloud_shader(fragment, uniforms),
-      2 => cellular_shader(fragment, uniforms),
-      3 => lava_shader(fragment, uniforms),
+      1 => earth_shader(fragment, uniforms, time),
+      2 => lava_shader(fragment, uniforms),
       // Continúa con otros shaders según sea necesario
       _ => Color::new(0, 0, 0), // Color por defecto si no hay un shader definido
+  }
+}
+
+fn earth_shader(fragment: &Fragment, uniforms: &Uniforms, time: f32) -> Color {
+  let shift_rate = 10.0;  // Incrementa esto para un desplazamiento más rápido
+  let shift_x = time * shift_rate;  // Velocidad de movimiento en x
+  let shift_y = time * shift_rate;  // Velocidad de movimiento en y
+
+  let base_noise_value = uniforms.noise.get_noise_2d(fragment.vertex_position.x, fragment.vertex_position.y);
+  let cloud_noise_value = uniforms.cloud_noise.get_noise_2d(
+      fragment.vertex_position.x + shift_x, 
+      fragment.vertex_position.y + shift_y
+  );
+
+  // Colores base para el agua y la tierra
+  let water_color_1 = Color::from_float(0.0, 0.1, 0.6); // Azul oscuro
+  let water_color_2 = Color::from_float(0.0, 0.3, 0.7); // Azul claro
+  let land_color_1 = Color::from_float(0.1, 0.5, 0.0); // Verde oscuro
+  let land_color_2 = Color::from_float(0.2, 0.8, 0.2); // Verde claro
+  let cloud_color = Color::from_float(0.9, 0.9, 0.9); // Color casi blanco para las nubes
+
+  let land_threshold = 0.3; // Umbral para tierra
+
+  // Decidir si el fragmento es agua o tierra
+  let base_color = if base_noise_value > land_threshold {
+      land_color_1.lerp(&land_color_2, (base_noise_value - land_threshold) / (1.0 - land_threshold))
+  } else {
+      water_color_1.lerp(&water_color_2, base_noise_value / land_threshold)
+  };
+
+  // Iluminación más dramática
+  let light_position = Vec3::new(1.0, 1.0, 3.0); // Posición de la luz ajustada para mayor contraste
+  let light_dir = normalize(&(light_position - fragment.vertex_position)); // Dirección de la luz ajustada
+  let normal = normalize(&fragment.normal); // Normalizar la normal
+  let diffuse = dot(&normal, &light_dir).max(0.0); // Cálculo de la componente difusa
+
+  // Aplicar la intensidad de la luz difusa al color base
+  let lit_color = base_color * (0.1 + 0.9 * diffuse); // Reducir luz ambiental para sombras más oscuras
+
+  // Superponer nubes si el valor es alto
+  let cloud_threshold = 0.8; // Umbral para la aparición de nubes
+  let cloud_opacity = 0.3 + 0.2 * (time * 0.5).sin().abs(); 
+  if cloud_noise_value > cloud_threshold {
+      let cloud_intensity = ((cloud_noise_value - cloud_threshold) / (1.0 - cloud_threshold)).clamp(0.0, 1.0);
+      lit_color.blend_add(&(cloud_color * (cloud_intensity * cloud_opacity)))
+  } else {
+      lit_color
   }
 }
 

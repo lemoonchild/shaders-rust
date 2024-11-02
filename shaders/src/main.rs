@@ -1,6 +1,6 @@
 use nalgebra_glm::{Vec3, Mat4, look_at, perspective};
 use minifb::{Key, Window, WindowOptions};
-use std::f32::consts::PI;
+use std::{f32::consts::PI, time::Instant, time::Duration};
 
 mod framebuffer;
 mod triangle;
@@ -25,23 +25,42 @@ pub struct Uniforms {
     view_matrix: Mat4,
     projection_matrix: Mat4,
     viewport_matrix: Mat4,
-    time: u32,
+    time: f32,
     noise: FastNoiseLite,
+    cloud_noise: FastNoiseLite, 
     current_shader: u8, 
 }
 
 fn create_noise(current_shader: u8) -> FastNoiseLite {
     match current_shader {
-        1 => create_cloud_noise(),
-        2 => create_cell_noise(),
-        3 => create_lava_noise(),
+        1 => create_earth_like_noise(),
+        2 => create_lava_noise(),
         _ => create_ground_noise(),  
     }
 }
 
-fn create_cloud_noise() -> FastNoiseLite {
+fn create_earth_like_noise() -> FastNoiseLite {
     let mut noise = FastNoiseLite::with_seed(1337);
-    noise.set_noise_type(Some(NoiseType::OpenSimplex2));
+    noise.set_noise_type(Some(NoiseType::OpenSimplex2S));
+
+    // Usar FBm (Fractal Brownian Motion) para una textura más compleja
+    noise.set_fractal_type(Some(FractalType::Ridged));
+    noise.set_fractal_octaves(Some(5)); // Octavas para mayor detalle
+    noise.set_fractal_lacunarity(Some(3.0)); // Lacunaridad para escalado de frecuencia
+    noise.set_fractal_gain(Some(0.5)); // Ganancia para el escalado de amplitud
+    noise.set_frequency(Some(0.5)); 
+
+    noise
+}
+
+fn create_cloud_noise() -> FastNoiseLite {
+    let mut noise = FastNoiseLite::with_seed(42);  // Diferente semilla para variación
+    noise.set_noise_type(Some(NoiseType::Perlin)); // Ruido de Perlin para texturas suaves
+    noise.set_fractal_type(Some(FractalType::FBm));
+    noise.set_fractal_octaves(Some(1));  // Menos octavas para menos detalles
+    noise.set_fractal_lacunarity(Some(2.0));
+    noise.set_fractal_gain(Some(0.5));
+    noise.set_frequency(Some(0.01));  // Baja frecuencia para nubes grandes y suaves
     noise
 }
 
@@ -59,7 +78,7 @@ fn create_ground_noise() -> FastNoiseLite {
     noise.set_noise_type(Some(NoiseType::Cellular)); // Cellular noise for cracks
     noise.set_fractal_type(Some(FractalType::FBm));  // Fractal Brownian Motion
     noise.set_fractal_octaves(Some(5));              // More octaves = more detail
-    noise.set_fractal_lacunarity(Some(2.0));         // Lacunarity controls frequency scaling
+    noise.set_fractal_lacunarity(Some(3.0));         // Lacunarity controls frequency scaling
     noise.set_fractal_gain(Some(0.5));               // Gain controls amplitude scaling
     noise.set_frequency(Some(0.05));                 // Lower frequency for larger features
 
@@ -141,7 +160,7 @@ fn create_viewport_matrix(width: f32, height: f32) -> Mat4 {
     )
 }
 
-fn render(framebuffer: &mut Framebuffer, uniforms: &Uniforms, vertex_array: &[Vertex]) {
+fn render(framebuffer: &mut Framebuffer, uniforms: &Uniforms, vertex_array: &[Vertex], time: f32) {
     // Vertex Shader Stage
     let mut transformed_vertices = Vec::with_capacity(vertex_array.len());
     for vertex in vertex_array {
@@ -173,7 +192,7 @@ fn render(framebuffer: &mut Framebuffer, uniforms: &Uniforms, vertex_array: &[Ve
         let y = fragment.position.y as usize;
         if x < framebuffer.width && y < framebuffer.height {
             // Apply fragment shader
-            let shaded_color = fragment_shader(&fragment, &uniforms);
+            let shaded_color = fragment_shader(&fragment, &uniforms, time);
             let color = shaded_color.to_hex();
             framebuffer.set_current_color(color);
             framebuffer.point(x, y, fragment.depth);
@@ -215,7 +234,8 @@ fn main() {
 
     let obj = Obj::load("assets/models/sphere.obj").expect("Failed to load obj");
     let vertex_arrays = obj.get_vertex_array(); 
-    let mut time = 0;
+    let mut last_frame_time = Instant::now();
+    let mut time = 0.0;
 
     let projection_matrix = create_perspective_matrix(window_width as f32, window_height as f32);
     let viewport_matrix = create_viewport_matrix(framebuffer_width as f32, framebuffer_height as f32);
@@ -224,17 +244,16 @@ fn main() {
         view_matrix: Mat4::identity(), 
         projection_matrix, 
         viewport_matrix, 
-        time: 0, 
+        time: 0.0, 
         noise: create_noise(1),
+        cloud_noise: create_cloud_noise(),
         current_shader: 1,
     };
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        if window.is_key_down(Key::Escape) {
-            break;
-        }
-
-        time += 1;
+        let delta_time = last_frame_time.elapsed();
+        last_frame_time = Instant::now();
+        time += delta_time.as_secs_f32();
 
         handle_input(&window, &mut camera);
 
@@ -253,7 +272,7 @@ fn main() {
             uniforms.noise = create_noise(uniforms.current_shader);
         }
 
-        render(&mut framebuffer, &uniforms, &vertex_arrays);
+        render(&mut framebuffer, &uniforms, &vertex_arrays, time);
 
         window
         .update_with_buffer(&framebuffer.buffer, framebuffer_width, framebuffer_height)
