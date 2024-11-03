@@ -28,6 +28,7 @@ pub struct Uniforms {
     time: u32,
     noise: FastNoiseLite,
     cloud_noise: FastNoiseLite, 
+    band_noise: FastNoiseLite, 
     current_shader: u8, 
 }
 
@@ -36,6 +37,8 @@ fn create_noise(current_shader: u8) -> FastNoiseLite {
         1 => create_earth_noise(),
         2 => create_mars_noise(),
         3 => create_mercury_noise(),
+        //4 => create_saturn_noise(),
+        5 => create_jupiter_noise(),
         8 => create_moon_noise(),
         _ => create_earth_noise(),  
     }
@@ -44,7 +47,6 @@ fn create_noise(current_shader: u8) -> FastNoiseLite {
 fn create_earth_noise() -> FastNoiseLite {
     let mut noise = FastNoiseLite::with_seed(1337);
     noise.set_noise_type(Some(NoiseType::OpenSimplex2S));
-
     noise.set_fractal_type(Some(FractalType::Ridged));
     noise.set_fractal_octaves(Some(5)); // Octavas para mayor detalle
     noise.set_fractal_lacunarity(Some(3.0)); // Lacunaridad para escalado de frecuencia
@@ -95,6 +97,25 @@ fn create_mercury_noise() -> FastNoiseLite {
     noise.set_fractal_lacunarity(Some(2.0));
     noise.set_fractal_gain(Some(1.0));
     noise.set_frequency(Some(5.0));  
+    noise
+}
+
+fn create_jupiter_noise() -> FastNoiseLite {
+    let mut noise = FastNoiseLite::with_seed(5678); // Puedes elegir cualquier semilla
+    noise.set_noise_type(Some(NoiseType::OpenSimplex2)); // OpenSimplex2 produce un ruido más suave
+    noise.set_fractal_type(Some(FractalType::DomainWarpProgressive)); // Añade complejidad fractal
+    noise.set_fractal_octaves(Some(6)); // Más octavas para más detalle
+    noise.set_fractal_lacunarity(Some(2.0)); // Lacunaridad estándar
+    noise.set_fractal_gain(Some(0.5)); // Ganancia menor para detalles finos
+    noise.set_frequency(Some(2.0)); // Ajusta la escala del ruido
+    noise
+}
+
+fn create_jupiter_band_noise() -> FastNoiseLite {
+    let mut noise = FastNoiseLite::with_seed(7890); // Nueva semilla
+    noise.set_noise_type(Some(NoiseType::OpenSimplex2));
+    noise.set_frequency(Some(1.0));
+    noise.set_fractal_type(Some(FractalType::None));
     noise
 }
 
@@ -255,6 +276,7 @@ fn main() {
         time: 0, 
         noise: create_noise(1),
         cloud_noise: create_cloud_noise(),
+        band_noise: create_jupiter_band_noise(), 
         current_shader: 1,
     };
 

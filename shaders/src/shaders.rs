@@ -49,6 +49,8 @@ pub fn fragment_shader(fragment: &Fragment, uniforms: &Uniforms, time: u32) -> C
       1 => earth_shader(fragment, uniforms, time),
       2 => mars_planet_shader(fragment, uniforms),
       3 => mercury_shader(fragment, uniforms),
+      //4 => saturn_shader(fragment, uniforms),
+      5 => jupiter_shader(fragment, uniforms),
       8 => moon_shader(fragment, uniforms),
       _ => Color::new(0, 0, 0), // Color por defecto si no hay un shader definido
   }
@@ -200,6 +202,117 @@ pub fn mercury_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
   ambient_color + lit_color
 }
 
+// Tranisicón suave de la Gran Mancha Roja
+fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
+  let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
+  t * t * (3.0 - 2.0 * t)
+}
+// Calculo de uv 
+fn calculate_uv(position: Vec3) -> Vec2 {
+  let theta = position.z.atan2(position.x); // Longitud
+  let phi = position.y.asin(); // Latitud
+  Vec2::new(
+      0.5 + theta / (2.0 * std::f32::consts::PI),
+      0.5 - phi / std::f32::consts::PI,
+  )
+}    
+
+fn jupiter_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
+  // Capa 1: Bandas horizontales difuminadas
+  let latitude = fragment.vertex_position.y;
+  let band_frequency = 10.0;
+
+  // Agregar ruido al patrón de bandas
+  let band_noise = uniforms.band_noise.get_noise_2d(
+      fragment.vertex_position.x * 2.0,
+      fragment.vertex_position.y * 2.0,
+  );
+  let band_noise_intensity = 0.2;
+  let distorted_latitude = latitude + band_noise * band_noise_intensity;
+  let band_pattern = (distorted_latitude * band_frequency).sin();
+
+  // Definir una paleta de colores con los nuevos tonos
+  let band_colors = [
+      Color::from_hex(0xc6bcad), // Color base
+      Color::from_hex(0x955d36), // Color de las líneas
+      Color::from_hex(0xc7c7cf), // Reemplazo del azul con gris claro
+  ];
+
+  // Interpolación suave entre colores
+  let normalized_band = (band_pattern + 1.0) / 2.0 * (band_colors.len() as f32 - 1.0);
+  let index = normalized_band.floor() as usize;
+  let t = normalized_band.fract();
+  let color1 = band_colors[index % band_colors.len()];
+  let color2 = band_colors[(index + 1) % band_colors.len()];
+  let base_color = color1.lerp(&color2, t);
+
+  // Capa 2: Turbulencia con ruido
+  let noise_value = uniforms.noise.get_noise_3d(
+      fragment.vertex_position.x * 4.0,
+      fragment.vertex_position.y * 4.0,
+      fragment.vertex_position.z * 4.0,
+  );
+
+  let turbulence_intensity = 0.3;
+  let turbulence_color = base_color.lerp(&Color::from_hex(0xffffff), noise_value * turbulence_intensity);
+
+  // Capa adicional: Variación de color con ruido
+  let color_noise_value = uniforms.noise.get_noise_3d(
+      fragment.vertex_position.x * 3.0,
+      fragment.vertex_position.y * 3.0,
+      fragment.vertex_position.z * 3.0,
+  );
+
+  let terracotta_variation_color = Color::from_hex(0x955d36); // Color terracota para variaciones
+  let gray_variation_color = Color::from_hex(0xc7c7cf); // Gris claro para variaciones
+
+  let terracotta_intensity = ((color_noise_value + 1.0) * 0.5).clamp(0.0, 1.0);
+  let gray_intensity = (1.0 - terracotta_intensity).clamp(0.0, 1.0);
+
+  let color_with_variation = turbulence_color
+      .lerp(&terracotta_variation_color, terracotta_intensity * 0.2)
+      .lerp(&gray_variation_color, gray_intensity * 0.2);
+
+  // Capa 3: Gran Mancha Roja con color ajustado y difuminada
+  let uv = fragment.uv.unwrap_or_else(|| calculate_uv(fragment.vertex_position));
+  let red_spot_center = Vec2::new(0.65, 0.5);
+  let distance_to_spot = (uv - red_spot_center).norm();
+
+  let red_spot_noise_value = uniforms.noise.get_noise_2d(
+      uv.x * 20.0,
+      uv.y * 20.0,
+  );
+  let red_spot_noise_intensity = red_spot_noise_value * 0.3;
+
+  let red_spot_radius = 0.1;
+  let red_spot_edge = 0.08;
+  let red_spot_intensity = smoothstep(
+      red_spot_radius + red_spot_edge,
+      red_spot_radius - red_spot_edge,
+      distance_to_spot,
+  );
+
+  let red_spot_intensity = (red_spot_intensity + red_spot_noise_intensity).clamp(0.0, 1.0);
+
+  let red_spot_color = Color::from_hex(0xac6300); // Nuevo color de la Gran Mancha Roja
+  let final_color = color_with_variation.lerp(&red_spot_color, red_spot_intensity * 0.9);
+
+  // Iluminación
+  let light_position = Vec3::new(0.0, 8.0, 9.0);
+  let light_direction = (light_position - fragment.vertex_position).normalize();
+  let normal = fragment.normal.normalize();
+  let diffuse = normal.dot(&light_direction).max(0.0);
+
+  // Combinación de la iluminación con el color
+  let ambient_intensity = 0.15;
+  let ambient_color = final_color * ambient_intensity;
+  let lit_color = final_color * diffuse;
+
+  // Suma del componente ambiental y difuso
+  let color_with_lighting = ambient_color + lit_color;
+
+  color_with_lighting
+}
 
 
 
