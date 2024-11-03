@@ -115,7 +115,7 @@ fn create_jupiter_band_noise() -> FastNoiseLite {
     let mut noise = FastNoiseLite::with_seed(7890); // Nueva semilla
     noise.set_noise_type(Some(NoiseType::OpenSimplex2));
     noise.set_frequency(Some(1.0));
-    noise.set_fractal_type(Some(FractalType::None));
+    noise.set_fractal_type(Some(FractalType::FBm));
     noise
 }
 
