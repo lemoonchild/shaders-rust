@@ -1,6 +1,6 @@
 use nalgebra_glm::{Vec3, Mat4, look_at, perspective};
 use minifb::{Key, Window, WindowOptions};
-use std::{f32::consts::PI, time::Instant, time::Duration};
+use std::{f32::consts::PI, time::Instant};
 
 mod framebuffer;
 mod triangle;
@@ -34,8 +34,14 @@ pub struct Uniforms {
 fn create_noise(current_shader: u8) -> FastNoiseLite {
     match current_shader {
         1 => create_earth_noise(),
-        2 => create_cloud_noise(),
-        _ => create_cloud_noise(),  
+        2 => create_mars_noise(),
+        3 => create_mars_noise(),
+        4 => create_mars_noise(),
+        5 => create_mars_noise(),
+        6 => create_mars_noise(),
+        7 => create_mars_noise(),
+        8 => create_moon_noise(),
+        _ => create_earth_noise(),  
     }
 }
 
@@ -62,6 +68,29 @@ fn create_cloud_noise() -> FastNoiseLite {
     noise.set_frequency(Some(0.01));  // Baja frecuencia para nubes grandes y suaves
     noise
 }
+
+fn create_mars_noise() -> FastNoiseLite {
+    let mut noise = FastNoiseLite::with_seed(1234);
+    noise.set_noise_type(Some(NoiseType::Perlin));
+    noise.set_fractal_type(Some(FractalType::Ridged));
+    noise.set_fractal_octaves(Some(4));
+    noise.set_fractal_lacunarity(Some(2.0));
+    noise.set_fractal_gain(Some(0.5));
+    noise.set_frequency(Some(1.5)); 
+    noise
+}
+
+fn create_moon_noise() -> FastNoiseLite {
+    let mut noise = FastNoiseLite::with_seed(4321);
+    noise.set_noise_type(Some(NoiseType::OpenSimplex2));
+    noise.set_fractal_type(Some(FractalType::PingPong));
+    noise.set_fractal_octaves(Some(2));
+    noise.set_fractal_lacunarity(Some(2.0));
+    noise.set_fractal_gain(Some(0.5));
+    noise.set_frequency(Some(3.0));  
+    noise
+}
+
 
 fn create_model_matrix(translation: Vec3, scale: f32, rotation: Vec3) -> Mat4 {
     let (sin_x, cos_x) = rotation.x.sin_cos();
@@ -191,15 +220,24 @@ fn main() {
 
     // camera parameters
     let mut camera = Camera::new(
-        Vec3::new(0.0, 0.0, 5.0),
+        Vec3::new(0.0, 0.0, 10.0),
         Vec3::new(0.0, 0.0, 0.0),
         Vec3::new(0.0, 1.0, 0.0)
     );
 
     let obj = Obj::load("assets/models/sphere.obj").expect("Failed to load obj");
+    let moon = Obj::load("assets/models/moon.obj").expect("Failed to load obj");
+
     let vertex_arrays = obj.get_vertex_array(); 
+    let moon_vertex_array = moon.get_vertex_array();
+
     let mut last_frame_time = Instant::now();
     let mut time = 0;
+
+    // Lunas de los planetas rocosos
+    let moon_scale = 0.5; // Escala de la luna respecto al planeta
+    let moon_distance = 2.5; // Distancia de la luna al planeta
+    let moon_orbit_speed = 0.003; // Velocidad orbital de la luna
 
     let projection_matrix = create_perspective_matrix(window_width as f32, window_height as f32);
     let viewport_matrix = create_viewport_matrix(framebuffer_width as f32, framebuffer_height as f32);
@@ -214,27 +252,78 @@ fn main() {
         current_shader: 1,
     };
 
+    let mut current_planet = 1; 
+
     while window.is_open() && !window.is_key_down(Key::Escape) {
         let delta_time = last_frame_time.elapsed();
         last_frame_time = Instant::now();
         time += delta_time.as_millis() as u32;
 
-        handle_input(&window, &mut camera);
+        let keys = window.get_keys_pressed(minifb::KeyRepeat::No);
+        for key in keys {
+            match key {
+                Key::Key1 => {
+                    current_planet = 1;
+                }
+                Key::Key2 => {
+                    current_planet = 2;
+                }
+                Key::Key3 => {
+                    current_planet = 3;
+                }
+                Key::Key4 => {
+                    current_planet = 4;
+                }
+                Key::Key5 => {
+                    current_planet = 5;
+                }
+                Key::Key6 => {
+                    current_planet = 6;
+                }
+                Key::Key7 => {
+                    current_planet = 7;
+                }
+                _ => {}
+            }
+        }
 
+        handle_input(&window, &mut camera);
         framebuffer.clear();
+        
+        uniforms.current_shader = current_planet;
+        uniforms.noise = create_noise(uniforms.current_shader);
+
+        uniforms.view_matrix = create_view_matrix(camera.eye, camera.center, camera.up);
+        uniforms.time = time as u32;
+
+        // Renderizar el planeta Marte cuando esté seleccionado
+        if current_planet == 2 {
+            // Renderizar Marte
+            uniforms.current_shader = 2; 
+            uniforms.model_matrix = create_model_matrix(translation, scale, rotation);
+            render(&mut framebuffer, &uniforms, &vertex_arrays, time as u32);
+        
+            // Calcular y renderizar la luna de Marte
+            let moon_angle = time as f32 * moon_orbit_speed;
+            let moon_x = moon_distance * moon_angle.cos();
+            let moon_z = moon_distance * moon_angle.sin();
+        
+            let moon_translation = Vec3::new(moon_x, 0.0, moon_z);
+            let moon_model_matrix = create_model_matrix(moon_translation, moon_scale, Vec3::new(0.0, 0.0, 0.0));
+            uniforms.model_matrix = moon_model_matrix;
+            
+            let moon_shader_id = 8; 
+            uniforms.current_shader = moon_shader_id;
+            // Si deseas usar un shader diferente para la luna, puedes ajustar `uniforms.current_shader` aquí
+            render(&mut framebuffer, &uniforms, &moon_vertex_array, time as u32);
+        } else {
+            // Renderizar otros planetas sin lunas
+            uniforms.model_matrix = create_model_matrix(translation, scale, rotation);
+            render(&mut framebuffer, &uniforms, &vertex_arrays, time as u32);
+        }
 
         uniforms.model_matrix = create_model_matrix(translation, scale, rotation);
-        uniforms.view_matrix = create_view_matrix(camera.eye, camera.center, camera.up);
-        uniforms.time = time;
         framebuffer.set_current_color(0xFFDDDD);
-
-        if window.is_key_down(Key::Key1) {
-            uniforms.current_shader = 1;
-            uniforms.noise = create_noise(uniforms.current_shader);  
-        } else if window.is_key_down(Key::Key2) {
-            uniforms.current_shader = 2;
-            uniforms.noise = create_noise(uniforms.current_shader);
-        }
 
         render(&mut framebuffer, &uniforms, &vertex_arrays, time);
 

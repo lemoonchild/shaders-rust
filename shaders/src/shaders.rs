@@ -47,8 +47,8 @@ pub fn vertex_shader(vertex: &Vertex, uniforms: &Uniforms) -> Vertex {
 pub fn fragment_shader(fragment: &Fragment, uniforms: &Uniforms, time: u32) -> Color {
   match uniforms.current_shader {
       1 => earth_shader(fragment, uniforms, time),
-      2 => cloud_shader(fragment, uniforms),
-      // Continúa con otros shaders según sea necesario
+      2 => mars_planet_shader(fragment, uniforms),
+      8 => moon_shader(fragment, uniforms),
       _ => Color::new(0, 0, 0), // Color por defecto si no hay un shader definido
   }
 }
@@ -100,27 +100,67 @@ fn earth_shader(fragment: &Fragment, uniforms: &Uniforms, time: u32) -> Color {
   }
 }
 
-fn cloud_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
-  let zoom = 100.0;  // to move our values 
-  let ox = 100.0; // offset x in the noise map
-  let oy = 100.0;
-  let x = fragment.vertex_position.x;
-  let y = fragment.vertex_position.y;
-  let t = uniforms.time as f32 * 0.5;
+fn mars_planet_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
+  let noise_value = uniforms.noise.get_noise_2d(fragment.vertex_position.x, fragment.vertex_position.y);
+  
+  let dark_red = Color::from_float(0.4, 0.1, 0.1); // Color oscuro para áreas en sombra
+  let bright_orange = Color::from_float(0.8, 0.4, 0.1); // Color brillante para áreas iluminadas
+  let terracotta = Color::from_float(0.6, 0.3, 0.1); // Color intermedio, típico de Marte
 
-  let noise_value = uniforms.noise.get_noise_2d(x * zoom + ox + t, y * zoom + oy);
-
-  // Define cloud threshold and colors
-  let cloud_threshold = 0.5; // Adjust this value to change cloud density
-  let cloud_color = Color::new(255, 255, 255); // White for clouds
-  let sky_color = Color::new(30, 97, 145); // Sky blue
-
-  // Determine if the pixel is part of a cloud or sky
-  let noise_color = if noise_value > cloud_threshold {
-    cloud_color
+  // Usar lerp para mezclar colores basado en el valor del ruido
+  let lerp_factor = noise_value.clamp(0.0, 1.0); // Asegurar que esté entre 0 y 1
+  let base_color = if lerp_factor < 0.5 {
+    dark_red.lerp(&terracotta, lerp_factor * 2.0) // Interpola entre rojo oscuro y terracotta
   } else {
-    sky_color
+    terracotta.lerp(&bright_orange, (lerp_factor - 0.5) * 2.0) // Interpola entre terracotta y naranja brillante
   };
 
-  noise_color * fragment.intensity
+  // Definir la posición y dirección de la luz
+  let light_pos = Vec3::new(0.0, 8.0, 9.0);  // Posición de la fuente de luz
+  let light_dir = (light_pos - fragment.vertex_position).normalize(); // Dirección de la luz desde la posición del fragmento
+
+  // Normalizar la normal del fragmento
+  let normal = fragment.normal.normalize();
+
+  // Calcular la intensidad de la luz difusa
+  let diffuse_intensity = normal.dot(&light_dir).max(0.0);
+
+  // Modificar el color final basado en la intensidad de la luz
+  let lit_color = base_color * diffuse_intensity;  // Modula el color por la intensidad de la luz
+
+  // Añadir un término ambiental para evitar que las partes no iluminadas sean completamente oscuras
+  let ambient_intensity = 0.15;  // Intensidad de luz ambiental, ajusta según necesites
+  let ambient_color = base_color * ambient_intensity;
+
+  // Suma del componente ambiental y difuso
+  let combined_color = ambient_color + lit_color;
+
+  combined_color
 }
+
+pub fn moon_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
+  // Base y detalles de color más distintos
+  let base_color = Color::from_float(0.8, 0.8, 0.8); // Gris base
+  let detail_color = Color::from_float(0.3, 0.3, 0.3); // Gris más oscuro para detalles
+
+  // Genera variaciones en la superficie
+  let noise_value = uniforms.noise.get_noise_2d(fragment.vertex_position.x, fragment.vertex_position.y);
+
+  // Normaliza el valor del ruido a [0, 1]
+  let normalized_noise = (noise_value + 1.0) * 0.5; // Ajusta según el rango real de tu generador de ruido
+  let surface_variation = base_color.lerp(&detail_color, normalized_noise.clamp(0.0, 1.0));
+
+  // Iluminación simple
+  let light_position = Vec3::new(10.0, 10.0, 10.0);
+  let light_direction = (light_position - fragment.vertex_position).normalize();
+  let normal = fragment.normal.normalize();
+  let diffuse = normal.dot(&light_direction).max(0.0);
+
+  // Combinar color de superficie con iluminación
+  surface_variation * (0.3 + 0.7 * diffuse) 
+}
+
+
+
+
+
