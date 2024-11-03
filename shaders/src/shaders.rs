@@ -51,6 +51,7 @@ pub fn fragment_shader(fragment: &Fragment, uniforms: &Uniforms, time: u32) -> C
       3 => mercury_shader(fragment, uniforms),
       //4 => saturn_shader(fragment, uniforms),
       5 => jupiter_shader(fragment, uniforms),
+      6 => urano_shader(fragment, uniforms, time),
       8 => moon_shader(fragment, uniforms),
       _ => Color::new(0, 0, 0), // Color por defecto si no hay un shader definido
   }
@@ -314,6 +315,31 @@ fn jupiter_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
   color_with_lighting
 }
 
+fn urano_shader(fragment: &Fragment, uniforms: &Uniforms, time: u32) -> Color {
+  let x = fragment.vertex_position.x;
+  let y = fragment.vertex_position.y;
+  let z = fragment.vertex_position.z;
+  let t = time as f32 * 0.001; // Escala de tiempo para el movimiento
+
+  // Coordenadas de ruido para simular movimiento atmosférico
+  let noise_value = uniforms.noise.get_noise_3d(x, y + t, z);
+
+  // Color base de Urano
+  let base_color = Color::from_float(0.2, 0.5, 0.9); // Un azul característico de Urano
+
+  // Intensidad del ruido para variar el color base
+  let intensity = (noise_value * 0.5 + 0.5).clamp(0.0, 1.0); // Normaliza y asegura los límites
+  let varied_color = base_color * intensity;
+
+  // Iluminación direccional para resaltar la textura
+  let light_dir = Vec3::new(1.0, 1.0, 1.0).normalize(); // Dirección de luz arbitraria
+  let normal = fragment.normal.normalize(); // Normalizar la normal del fragmento
+  let diffuse = normal.dot(&light_dir).max(0.0); // Cálculo difuso
+  let ambient = 0.3; // Intensidad ambiental
+  let lit_color = varied_color * (ambient + (1.0 - ambient) * diffuse); // Combinación de iluminación
+
+  lit_color
+}
 
 
 
