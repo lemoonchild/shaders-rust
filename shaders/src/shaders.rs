@@ -1,4 +1,4 @@
-use nalgebra_glm::{Vec3, Vec4, Mat3, mat4_to_mat3, dot, normalize};
+use nalgebra_glm::{dot, mat4_to_mat3, normalize, Mat3, Vec2, Vec3, Vec4};
 use crate::vertex::Vertex;
 use crate::Uniforms;
 use crate::fragment::Fragment;
@@ -48,6 +48,7 @@ pub fn fragment_shader(fragment: &Fragment, uniforms: &Uniforms, time: u32) -> C
   match uniforms.current_shader {
       1 => earth_shader(fragment, uniforms, time),
       2 => mars_planet_shader(fragment, uniforms),
+      3 => mercury_shader(fragment, uniforms),
       8 => moon_shader(fragment, uniforms),
       _ => Color::new(0, 0, 0), // Color por defecto si no hay un shader definido
   }
@@ -159,6 +160,46 @@ pub fn moon_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
   // Combinar color de superficie con iluminación
   surface_variation * (0.3 + 0.7 * diffuse) 
 }
+
+pub fn mercury_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
+  // Colores base para la superficie de Mercurio
+  let gray_light = Color::from_float(0.7, 0.7, 0.7);
+  let gray_dark = Color::from_float(0.4, 0.4, 0.4);
+  let brown = Color::from_float(0.5, 0.4, 0.3);
+  let blue_tint = Color::from_float(0.3, 0.3, 0.7);
+  let yellow_light = Color::from_float(0.8, 0.7, 0.4);
+
+  // Genera ruido para variaciones de color
+  let noise_value1 = uniforms.noise.get_noise_2d(fragment.vertex_position.x, fragment.vertex_position.y);
+  let noise_value2 = uniforms.noise.get_noise_2d(fragment.vertex_position.x * 2.0, fragment.vertex_position.y * 2.0); // Ajustar frecuencia
+  let noise_value3 = uniforms.noise.get_noise_2d(fragment.vertex_position.x * 0.5, fragment.vertex_position.y * 0.5); // Baja frecuencia
+
+  // Normaliza los valores de ruido
+  let lerp_factor1 = (noise_value1 + 1.0) * 0.5; // Normalizar a [0, 1]
+  let lerp_factor2 = (noise_value2 + 1.0) * 0.5;
+  let lerp_factor3 = (noise_value3 + 1.0) * 0.5;
+
+  // Mezcla de colores usando `lerp`
+  let color_mix1 = gray_light.lerp(&gray_dark, lerp_factor1);
+  let color_mix2 = color_mix1.lerp(&brown, lerp_factor2 * 2.5);
+  let color_mix3 = color_mix2.lerp(&blue_tint, lerp_factor2 * 1.5);
+  let final_color = color_mix3.lerp(&yellow_light, lerp_factor3);
+
+  // Iluminación para dar más realismo
+  let light_position = Vec3::new(0.0, 8.0, 9.0);
+  let light_direction = (light_position - fragment.vertex_position).normalize();
+  let normal = fragment.normal.normalize();
+  let diffuse = normal.dot(&light_direction).max(0.0);
+
+  // Combinación de la iluminación con el color
+  let ambient_intensity = 0.15;
+  let ambient_color = final_color * ambient_intensity;
+  let lit_color = final_color * diffuse;
+
+  // Suma del componente ambiental y difuso
+  ambient_color + lit_color
+}
+
 
 
 

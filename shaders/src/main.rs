@@ -35,11 +35,7 @@ fn create_noise(current_shader: u8) -> FastNoiseLite {
     match current_shader {
         1 => create_earth_noise(),
         2 => create_mars_noise(),
-        3 => create_mars_noise(),
-        4 => create_mars_noise(),
-        5 => create_mars_noise(),
-        6 => create_mars_noise(),
-        7 => create_mars_noise(),
+        3 => create_mercury_noise(),
         8 => create_moon_noise(),
         _ => create_earth_noise(),  
     }
@@ -91,6 +87,16 @@ fn create_moon_noise() -> FastNoiseLite {
     noise
 }
 
+fn create_mercury_noise() -> FastNoiseLite {
+    let mut noise = FastNoiseLite::with_seed(4321);
+    noise.set_noise_type(Some(NoiseType::Perlin));
+    noise.set_fractal_type(Some(FractalType::PingPong));
+    noise.set_fractal_octaves(Some(5));
+    noise.set_fractal_lacunarity(Some(2.0));
+    noise.set_fractal_gain(Some(1.0));
+    noise.set_frequency(Some(5.0));  
+    noise
+}
 
 fn create_model_matrix(translation: Vec3, scale: f32, rotation: Vec3) -> Mat4 {
     let (sin_x, cos_x) = rotation.x.sin_cos();
