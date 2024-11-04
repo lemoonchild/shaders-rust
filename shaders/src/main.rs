@@ -41,7 +41,7 @@ fn create_noise(current_shader: u8) -> FastNoiseLite {
         5 => create_jupiter_noise(),
         6 => create_urano_noise(),
         8 => create_moon_noise(),
-        9 => create_ring_noise(), 
+        9 => FastNoiseLite::new(),
         _ => create_earth_noise(),  
     }
 }
@@ -129,17 +129,6 @@ fn create_urano_noise() -> FastNoiseLite {
     noise.set_fractal_lacunarity(Some(2.0));
     noise.set_fractal_gain(Some(0.4));
     noise.set_frequency(Some(0.2));
-    noise
-}
-
-fn create_ring_noise() -> FastNoiseLite {
-    let mut noise = FastNoiseLite::with_seed(4321);
-    noise.set_noise_type(Some(NoiseType::OpenSimplex2));
-    noise.set_fractal_type(Some(FractalType::PingPong));
-    noise.set_fractal_octaves(Some(2));
-    noise.set_fractal_lacunarity(Some(2.0));
-    noise.set_fractal_gain(Some(0.5));
-    noise.set_frequency(Some(3.0));  
     noise
 }
 
@@ -278,9 +267,11 @@ fn main() {
 
     let obj = Obj::load("assets/models/sphere.obj").expect("Failed to load obj");
     let moon = Obj::load("assets/models/moon.obj").expect("Failed to load obj");
+    let ring_obj = Obj::load("assets/models/ring.obj").expect("Failed to load ring model");
 
     let vertex_arrays = obj.get_vertex_array(); 
     let moon_vertex_array = moon.get_vertex_array();
+    let ring_vertex_array = ring_obj.get_vertex_array();
 
     let mut last_frame_time = Instant::now();
     let mut time = 0;
@@ -348,10 +339,9 @@ fn main() {
         uniforms.view_matrix = create_view_matrix(camera.eye, camera.center, camera.up);
         uniforms.time = time as u32;
 
-        // Renderizar el planeta Marte cuando esté seleccionado
         if current_planet == 2 {
             // Renderizar Marte
-            uniforms.current_shader = 2; 
+            uniforms.current_shader = 2;
             uniforms.model_matrix = create_model_matrix(translation, scale, rotation);
             render(&mut framebuffer, &uniforms, &vertex_arrays, time as u32);
         
@@ -363,18 +353,30 @@ fn main() {
             let moon_translation = Vec3::new(moon_x, 0.0, moon_z);
             let moon_model_matrix = create_model_matrix(moon_translation, moon_scale, Vec3::new(0.0, 0.0, 0.0));
             uniforms.model_matrix = moon_model_matrix;
-            
-            let moon_shader_id = 8; 
+        
+            let moon_shader_id = 8;
             uniforms.current_shader = moon_shader_id;
-            // Si deseas usar un shader diferente para la luna, puedes ajustar `uniforms.current_shader` aquí
             render(&mut framebuffer, &uniforms, &moon_vertex_array, time as u32);
-           
+        
+        } else if current_planet == 4 {
+            // Renderizar Saturno
+            uniforms.current_shader = 4;  // Shader para Saturno
+            uniforms.model_matrix = create_model_matrix(translation, scale, rotation);
+            render(&mut framebuffer, &uniforms, &vertex_arrays, time as u32);
+        
+            // Renderizar los anillos de Saturno
+            uniforms.current_shader = 9;  // Shader para los anillos
+            let ring_translation = translation;  // Posición de los anillos
+            let ring_scale = scale * 1.5;  // Tamaño de los anillos (más grande que el planeta)
+            uniforms.model_matrix = create_model_matrix(ring_translation, ring_scale, Vec3::new(0.0, 0.0, 0.0));
+            render(&mut framebuffer, &uniforms, &ring_vertex_array, time as u32);  // Reutiliza `ring_vertex_array` para la geometría de los anillos
+        
         } else {
             // Renderizar otros planetas sin lunas
             uniforms.model_matrix = create_model_matrix(translation, scale, rotation);
             render(&mut framebuffer, &uniforms, &vertex_arrays, time as u32);
         }
-
+        
         uniforms.model_matrix = create_model_matrix(translation, scale, rotation);
         framebuffer.set_current_color(0xFFDDDD);
 

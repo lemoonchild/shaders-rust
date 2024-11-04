@@ -53,7 +53,7 @@ pub fn fragment_shader(fragment: &Fragment, uniforms: &Uniforms, time: u32) -> C
       5 => jupiter_shader(fragment, uniforms),
       6 => urano_shader(fragment, uniforms, time),
       8 => moon_shader(fragment, uniforms),
-      9 => ring_shader(fragment, uniforms),
+      9 => ring_shader(fragment),
       _ => Color::new(0, 0, 0), // Color por defecto si no hay un shader definido
   }
 }
@@ -382,16 +382,36 @@ fn saturn_shader(fragment: &Fragment) -> Color {
   ambient_color + diffuse_color
 }
 
-pub fn ring_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
-  // Base color for the rings, could be a more realistic color
-  let base_color = Color::from_float(0.7, 0.7, 0.7);
+pub fn ring_shader(fragment: &Fragment) -> Color {
+  // Coordenadas en 2D para determinar la distancia desde el centro de los anillos
+  let position = Vec2::new(fragment.vertex_position.x, fragment.vertex_position.z); // Usar X y Z para planos
+  let distance_from_center = position.magnitude(); // Calcular la distancia desde el centro
 
-  // Noise to modulate the color intensity
-  let noise_value = uniforms.band_noise.get_noise_2d(fragment.vertex_position.x, fragment.vertex_position.y);
-  let intensity = (noise_value + 1.0) * 0.5; // Normalize noise to [0, 1]
+  // Definir el número de bandas y su ancho
+  let num_bands = 2; // Número total de bandas en los anillos
+  let max_distance = 1.0; // Distancia máxima para las bandas (ajustar según el tamaño de los anillos)
+  let band_width = max_distance / num_bands as f32; // Ancho de cada banda
 
-  // Modulate the base color by the intensity, simulating transparency
-  base_color * intensity
+  // Calcular en qué banda está el fragmento actual
+  let band_index = (distance_from_center / band_width).floor() as i32;
+
+  // Variar el color de los anillos en función de su índice
+  let band_colors = [
+      Color::from_hex(0x817970), // Gris claro
+      Color::from_hex(0x474744), // Gris oscuro
+      Color::from_hex(0x817970), // Gris claro
+      Color::from_hex(0x474744), // Gris oscuro
+  ];
+
+  // Seleccionar el color basado en el índice de la banda y el número de bandas
+  let color = band_colors[(band_index.abs() % num_bands) as usize % band_colors.len()];
+
+  // Aplicar un efecto de difuminado en los bordes de las bandas
+  let edge_distance = (distance_from_center % band_width) / band_width;
+  let smooth_edge = (1.0 - edge_distance).clamp(0.0, 1.0);
+
+  // Modificar la opacidad para dar un efecto de transparencia a los anillos
+  let final_color = color * smooth_edge;
+
+  final_color
 }
-
-
