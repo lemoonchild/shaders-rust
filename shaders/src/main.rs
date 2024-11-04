@@ -37,10 +37,11 @@ fn create_noise(current_shader: u8) -> FastNoiseLite {
         1 => create_earth_noise(),
         2 => create_mars_noise(),
         3 => create_mercury_noise(),
-        //4 => create_saturn_noise(),
+        4 => FastNoiseLite::new(),
         5 => create_jupiter_noise(),
         6 => create_urano_noise(),
         8 => create_moon_noise(),
+        9 => create_ring_noise(), 
         _ => create_earth_noise(),  
     }
 }
@@ -128,6 +129,17 @@ fn create_urano_noise() -> FastNoiseLite {
     noise.set_fractal_lacunarity(Some(2.0));
     noise.set_fractal_gain(Some(0.4));
     noise.set_frequency(Some(0.2));
+    noise
+}
+
+fn create_ring_noise() -> FastNoiseLite {
+    let mut noise = FastNoiseLite::with_seed(4321);
+    noise.set_noise_type(Some(NoiseType::OpenSimplex2));
+    noise.set_fractal_type(Some(FractalType::PingPong));
+    noise.set_fractal_octaves(Some(2));
+    noise.set_fractal_lacunarity(Some(2.0));
+    noise.set_fractal_gain(Some(0.5));
+    noise.set_frequency(Some(3.0));  
     noise
 }
 
@@ -356,6 +368,7 @@ fn main() {
             uniforms.current_shader = moon_shader_id;
             // Si deseas usar un shader diferente para la luna, puedes ajustar `uniforms.current_shader` aquí
             render(&mut framebuffer, &uniforms, &moon_vertex_array, time as u32);
+           
         } else {
             // Renderizar otros planetas sin lunas
             uniforms.model_matrix = create_model_matrix(translation, scale, rotation);
@@ -364,8 +377,6 @@ fn main() {
 
         uniforms.model_matrix = create_model_matrix(translation, scale, rotation);
         framebuffer.set_current_color(0xFFDDDD);
-
-        render(&mut framebuffer, &uniforms, &vertex_arrays, time);
 
         window
         .update_with_buffer(&framebuffer.buffer, framebuffer_width, framebuffer_height)

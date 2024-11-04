@@ -49,10 +49,11 @@ pub fn fragment_shader(fragment: &Fragment, uniforms: &Uniforms, time: u32) -> C
       1 => earth_shader(fragment, uniforms, time),
       2 => mars_planet_shader(fragment, uniforms),
       3 => mercury_shader(fragment, uniforms),
-      //4 => saturn_shader(fragment, uniforms),
+      4 => saturn_shader(fragment),
       5 => jupiter_shader(fragment, uniforms),
       6 => urano_shader(fragment, uniforms, time),
       8 => moon_shader(fragment, uniforms),
+      9 => ring_shader(fragment, uniforms),
       _ => Color::new(0, 0, 0), // Color por defecto si no hay un shader definido
   }
 }
@@ -341,6 +342,56 @@ fn urano_shader(fragment: &Fragment, uniforms: &Uniforms, time: u32) -> Color {
   lit_color
 }
 
+fn saturn_shader(fragment: &Fragment) -> Color {
+  // Normalizar la latitud de -1 a 1 a un rango de 0 a 1
+  let latitude = (fragment.vertex_position.y + 1.0) * 0.5;
 
+  // Gradiente de colores desde el polo hasta el ecuador
+  let colors = [
+      Color::from_hex(0x6b6255), // Oscuro en las puntas
+      Color::from_hex(0xe0cdaf), // Color de transición hacia el centro
+      Color::from_hex(0xe8d4ab), // Color central claro
+      Color::from_hex(0xcfb98c), // Segundo color de transición
+      Color::from_hex(0xfef3d1), // Color central más claro
+      Color::from_hex(0xcfb98c), // Repetir para simetría
+      Color::from_hex(0xe8d4ab),
+      Color::from_hex(0xe0cdaf),
+      Color::from_hex(0x6b6255)  // Oscuro en las puntas
+  ];
+
+  // Calcular la posición en el array de colores basado en la latitud
+  let position_in_gradient = latitude * (colors.len() - 1) as f32;
+  let index = position_in_gradient.floor() as usize;
+  let frac = position_in_gradient.fract();
+
+  // Lerp entre colores cercanos para suavizar el gradiente
+  let base_color = colors[index];
+  let next_color = colors[index + 1 % colors.len()];
+  let color = base_color.lerp(&next_color, frac);
+
+  // Aplicar iluminación básica
+  let light_position = Vec3::new(1.0, 1.0, 10.0);
+  let light_direction = (light_position - fragment.vertex_position).normalize();
+  let normal = fragment.normal.normalize();
+  let diffuse = normal.dot(&light_direction).max(0.0);
+
+  let ambient_intensity = 0.1;  // Ajustar según la escena
+  let ambient_color = color * ambient_intensity;
+  let diffuse_color = color * diffuse;
+
+  ambient_color + diffuse_color
+}
+
+pub fn ring_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
+  // Base color for the rings, could be a more realistic color
+  let base_color = Color::from_float(0.7, 0.7, 0.7);
+
+  // Noise to modulate the color intensity
+  let noise_value = uniforms.band_noise.get_noise_2d(fragment.vertex_position.x, fragment.vertex_position.y);
+  let intensity = (noise_value + 1.0) * 0.5; // Normalize noise to [0, 1]
+
+  // Modulate the base color by the intensity, simulating transparency
+  base_color * intensity
+}
 
 
