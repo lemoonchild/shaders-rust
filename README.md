@@ -38,19 +38,25 @@ The Planetary Shader Project is an exploration into procedural rendering and sha
 ## Implemented Celestial Bodies
 
 ### The earth
+https://github.com/user-attachments/assets/52096288-fbf0-41cf-9051-830a224695cc
 
 ### Mars
+https://github.com/user-attachments/assets/c7cd7352-0a35-4326-ab73-2ab833656c67
 
 ### Mercury 
+https://github.com/user-attachments/assets/3ebd3214-7643-4e06-b3e9-71ca7a336e79
 
 ### Saturn
+https://github.com/user-attachments/assets/7105e67e-1089-44ea-8338-f166d05884c1
 
 ### Jupiter 
+https://github.com/user-attachments/assets/36037b2d-74c2-4d88-bc1a-d5e8f9fe0a69
 
 ### Urano
+https://github.com/user-attachments/assets/b2d9c89b-f4b2-42fd-8c9f-4c9b5a74643d
 
 ### Sun
-
+https://github.com/user-attachments/assets/285bb9e3-295e-4175-95c1-0e4a47f95bce
 
 ## Shader Techniques
 
