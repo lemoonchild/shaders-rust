@@ -464,7 +464,7 @@ fn main() {
             
             // Aplicar Gaussian Blur al buffer emisivo
             // Asegúrate de que el kernel_size y sigma están correctamente configurados para tu necesidad
-            let kernel_size = 30; // Tamaño del kernel más grande para un desenfoque más suave y amplio
+            let kernel_size = 20; // Tamaño del kernel más grande para un desenfoque más suave y amplio
             let sigma = 2.5; // Sigma para un desenfoque que produce un buen efecto de bloom
             gaussian_blur(&mut framebuffer.emissive_buffer, framebuffer.width, framebuffer.height, kernel_size, sigma);
             
