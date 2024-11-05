@@ -38,25 +38,19 @@ The Planetary Shader Project is an exploration into procedural rendering and sha
 ## Implemented Celestial Bodies
 
 ### The earth
-<video controls src="videos\20241105-1928-37.4232512.mp4" title="Earth"></video>
 
 ### Mars
-<video controls src="videos\20241105-1929-21.5232669.mp4" title="Mars"></video>
 
 ### Mercury 
-![Mercury](videos\image.png)
 
 ### Saturn
-<video controls src="videos\20241105-1930-33.0115835.mp4" title="Saturn"></video>
 
 ### Jupiter 
-![Jupiter](videos\image-1.png)
 
 ### Urano
-<video controls src="videos\20241105-1932-01.0689104.mp4" title="Urano"></video>
 
 ### Sun
-<video controls src="videos\20241105-1932-30.0620717.mp4" title="Sun"></video>
+
 
 ## Shader Techniques
 
