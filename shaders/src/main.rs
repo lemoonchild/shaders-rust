@@ -39,7 +39,7 @@ fn create_noise(current_shader: u8) -> FastNoiseLite {
         3 => create_mercury_noise(),
         4 => FastNoiseLite::new(),
         5 => create_jupiter_noise(),
-        6 => create_urano_noise(),
+        6 => create_urano_noise(), 
         8 => create_moon_noise(),
         9 => FastNoiseLite::new(),
         _ => create_earth_noise(),  
@@ -193,6 +193,89 @@ fn create_viewport_matrix(width: f32, height: f32) -> Mat4 {
     )
 }
 
+fn gaussian_blur(buffer: &mut [u32], width: usize, height: usize, kernel_size: usize, sigma: f32) {
+    let gaussian_kernel = create_gaussian_kernel(kernel_size, sigma);
+    let kernel_sum: f32 = gaussian_kernel.iter().map(|&x| x as f32).sum();
+
+    // Aplicar horizontalmente
+    for y in 0..height {
+        let mut temp_row = vec![0u32; width];
+        for x in 0..width {
+            let mut filtered_pixel = 0f32;
+            for k in 0..gaussian_kernel.len() {
+                let sample_x = x as i32 + k as i32 - (gaussian_kernel.len() / 2) as i32;
+                if sample_x >= 0 && sample_x < width as i32 {
+                    filtered_pixel += buffer[sample_x as usize + y * width] as f32 * gaussian_kernel[k] as f32;
+                }
+            }
+            temp_row[x] = (filtered_pixel / kernel_sum).round() as u32;
+        }
+        buffer[y * width..(y + 1) * width].copy_from_slice(&temp_row);
+    }
+
+    // Aplicar verticalmente
+    for x in 0..width {
+        let mut temp_col = vec![0u32; height];
+        for y in 0..height {
+            let mut filtered_pixel = 0f32;
+            for k in 0..gaussian_kernel.len() {
+                let sample_y = y as i32 + k as i32 - (gaussian_kernel.len() / 2) as i32;
+                if sample_y >= 0 && sample_y < height as i32 {
+                    filtered_pixel += buffer[x + sample_y as usize * width] as f32 * gaussian_kernel[k] as f32;
+                }
+            }
+            temp_col[y] = (filtered_pixel / kernel_sum).round() as u32;
+        }
+        for y in 0..height {
+            buffer[x + y * width] = temp_col[y];
+        }
+    }
+}
+
+// Crear un kernel Gaussiano dinámicamente
+fn create_gaussian_kernel(size: usize, sigma: f32) -> Vec<u32> {
+    let mut kernel = vec![0u32; size];
+    let mean = (size as f32 - 1.0) / 2.0;
+    let coefficient = 1.0 / (2.0 * std::f32::consts::PI * sigma * sigma).sqrt();
+
+    for x in 0..size {
+        let exp_numerator = -((x as f32 - mean) * (x as f32 - mean)) / (2.0 * sigma * sigma);
+        let exp_value = (-exp_numerator).exp();
+        kernel[x] = (coefficient * exp_value * 255.0) as u32;
+    }
+
+    kernel
+}
+
+fn apply_bloom(original: &mut [u32], bloom: &[u32], width: usize, height: usize) {
+    for i in 0..original.len() {
+        let original_color = original[i];
+        let bloom_intensity = bloom[i];
+        if bloom_intensity > 0 {
+            original[i] = blend_bloom(original_color, bloom_intensity);
+        }
+    }
+}
+
+fn blend_bloom(base_color: u32, bloom_intensity: u32) -> u32 {
+    // Factores para el tonemapping y la mezcla de bloom
+    let bloom_strength = 0.8;  // Ajusta esto para controlar la fuerza del efecto de bloom
+    let max_bloom_effect = 1.2;  // Este valor limita cuánto puede influir el bloom
+
+    let r = ((base_color >> 16) & 0xFF) as f32;
+    let g = ((base_color >> 8) & 0xFF) as f32;
+    let b = (base_color & 0xFF) as f32;
+    let bloom = bloom_intensity as f32 * bloom_strength;
+
+    // Calcular nueva intensidad de color con clamping para evitar saturación
+    let new_r = ((r + bloom).min(255.0 * max_bloom_effect)).min(255.0) as u32;
+    let new_g = ((g + bloom).min(255.0 * max_bloom_effect)).min(255.0) as u32;
+    let new_b = ((b + bloom).min(255.0 * max_bloom_effect)).min(255.0) as u32;
+
+    // Recomponer el color
+    (new_r << 16) | (new_g << 8) | new_b
+}
+
 fn render(framebuffer: &mut Framebuffer, uniforms: &Uniforms, vertex_array: &[Vertex], time: u32) {
     // Vertex Shader Stage
     let mut transformed_vertices = Vec::with_capacity(vertex_array.len());
@@ -220,15 +303,16 @@ fn render(framebuffer: &mut Framebuffer, uniforms: &Uniforms, vertex_array: &[Ve
     }
 
     // Fragment Processing Stage
+    // Fragment Processing Stage
     for fragment in fragments {
         let x = fragment.position.x as usize;
         let y = fragment.position.y as usize;
         if x < framebuffer.width && y < framebuffer.height {
             // Apply fragment shader
-            let shaded_color = fragment_shader(&fragment, &uniforms, time);
+            let (shaded_color, emission) = fragment_shader(&fragment, &uniforms, time);
             let color = shaded_color.to_hex();
             framebuffer.set_current_color(color);
-            framebuffer.point(x, y, fragment.depth);
+            framebuffer.point(x, y, fragment.depth, emission);  // Asegúrate de que `point` acepte y maneje `emission`
         }
     }
 }
@@ -372,6 +456,21 @@ fn main() {
             uniforms.model_matrix = create_model_matrix(ring_translation, ring_scale, Vec3::new(0.0, 0.0, 0.0));
             render(&mut framebuffer, &uniforms, &ring_vertex_array, time as u32);  // Reutiliza `ring_vertex_array` para la geometría de los anillos
         
+        } else if current_planet == 7{
+             // Configurar para renderizar el Sol
+            uniforms.current_shader = 7;
+            uniforms.model_matrix = create_model_matrix(translation, scale, rotation);
+            render(&mut framebuffer, &uniforms, &vertex_arrays, time as u32);
+            
+            // Aplicar Gaussian Blur al buffer emisivo
+            // Asegúrate de que el kernel_size y sigma están correctamente configurados para tu necesidad
+            let kernel_size = 30; // Tamaño del kernel más grande para un desenfoque más suave y amplio
+            let sigma = 2.5; // Sigma para un desenfoque que produce un buen efecto de bloom
+            gaussian_blur(&mut framebuffer.emissive_buffer, framebuffer.width, framebuffer.height, kernel_size, sigma);
+            
+            // Aplicar Bloom
+            apply_bloom(&mut framebuffer.buffer, &framebuffer.emissive_buffer, framebuffer.width, framebuffer.height);
+            
         } else {
             // Renderizar otros planetas sin lunas
             uniforms.model_matrix = create_model_matrix(translation, scale, rotation);

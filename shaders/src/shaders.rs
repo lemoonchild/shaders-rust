@@ -44,7 +44,7 @@ pub fn vertex_shader(vertex: &Vertex, uniforms: &Uniforms) -> Vertex {
   }
 }
 
-pub fn fragment_shader(fragment: &Fragment, uniforms: &Uniforms, time: u32) -> Color {
+pub fn fragment_shader(fragment: &Fragment, uniforms: &Uniforms, time: u32) -> (Color, u32) {
   match uniforms.current_shader {
       1 => earth_shader(fragment, uniforms, time),
       2 => mars_planet_shader(fragment, uniforms),
@@ -52,13 +52,14 @@ pub fn fragment_shader(fragment: &Fragment, uniforms: &Uniforms, time: u32) -> C
       4 => saturn_shader(fragment),
       5 => jupiter_shader(fragment, uniforms),
       6 => urano_shader(fragment, uniforms, time),
+      7 => sun_shader(),
       8 => moon_shader(fragment, uniforms),
       9 => ring_shader(fragment),
-      _ => Color::new(0, 0, 0), // Color por defecto si no hay un shader definido
+      _ => (Color::new(0, 0, 0), 0), // Color por defecto si no hay un shader definido
   }
 }
 
-fn earth_shader(fragment: &Fragment, uniforms: &Uniforms, time: u32) -> Color {
+fn earth_shader(fragment: &Fragment, uniforms: &Uniforms, time: u32) -> (Color, u32) {
   let zoom = 100.0;  // to move our values 
   let ox = 100.0; // offset x in the noise map
   let oy = 100.0;
@@ -99,13 +100,13 @@ fn earth_shader(fragment: &Fragment, uniforms: &Uniforms, time: u32) -> Color {
   let cloud_opacity = 0.3 + 0.2 * ((time as f32 / 1000.0) * 0.3).sin().abs(); 
   if cloud_noise_value > cloud_threshold {
       let cloud_intensity = ((cloud_noise_value - cloud_threshold) / (1.0 - cloud_threshold)).clamp(0.0, 1.0);
-      lit_color.blend_add(&(cloud_color * (cloud_intensity * cloud_opacity)))
+      (lit_color.blend_add(&(cloud_color * (cloud_intensity * cloud_opacity))), 0)
   } else {
-      lit_color
+      (lit_color, 0)
   }
 }
 
-fn mars_planet_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
+fn mars_planet_shader(fragment: &Fragment, uniforms: &Uniforms) -> (Color, u32) {
   let noise_value = uniforms.noise.get_noise_2d(fragment.vertex_position.x, fragment.vertex_position.y);
   
   let dark_red = Color::from_float(0.4, 0.1, 0.1); // Color oscuro para áreas en sombra
@@ -140,10 +141,10 @@ fn mars_planet_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
   // Suma del componente ambiental y difuso
   let combined_color = ambient_color + lit_color;
 
-  combined_color
+  (combined_color, 0)
 }
 
-pub fn moon_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
+pub fn moon_shader(fragment: &Fragment, uniforms: &Uniforms) -> (Color, u32) {
   // Base y detalles de color más distintos
   let base_color = Color::from_float(0.8, 0.8, 0.8); // Gris base
   let detail_color = Color::from_float(0.3, 0.3, 0.3); // Gris más oscuro para detalles
@@ -162,10 +163,10 @@ pub fn moon_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
   let diffuse = normal.dot(&light_direction).max(0.0);
 
   // Combinar color de superficie con iluminación
-  surface_variation * (0.3 + 0.7 * diffuse) 
+  (surface_variation * (0.3 + 0.7 * diffuse), 0)
 }
 
-pub fn mercury_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
+pub fn mercury_shader(fragment: &Fragment, uniforms: &Uniforms) -> (Color, u32) {
   // Colores base para la superficie de Mercurio
   let gray_light = Color::from_float(0.7, 0.7, 0.7);
   let gray_dark = Color::from_float(0.4, 0.4, 0.4);
@@ -201,7 +202,7 @@ pub fn mercury_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
   let lit_color = final_color * diffuse;
 
   // Suma del componente ambiental y difuso
-  ambient_color + lit_color
+  (ambient_color + lit_color, 0)
 }
 
 // Tranisicón suave de la Gran Mancha Roja
@@ -219,7 +220,7 @@ fn calculate_uv(position: Vec3) -> Vec2 {
   )
 }    
 
-fn jupiter_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
+fn jupiter_shader(fragment: &Fragment, uniforms: &Uniforms) -> (Color, u32) {
   // Capa 1: Bandas horizontales difuminadas
   let latitude = fragment.vertex_position.y;
   let band_frequency = 10.0;
@@ -313,10 +314,10 @@ fn jupiter_shader(fragment: &Fragment, uniforms: &Uniforms) -> Color {
   // Suma del componente ambiental y difuso
   let color_with_lighting = ambient_color + lit_color;
 
-  color_with_lighting
+  (color_with_lighting, 0)
 }
 
-fn urano_shader(fragment: &Fragment, uniforms: &Uniforms, time: u32) -> Color {
+fn urano_shader(fragment: &Fragment, uniforms: &Uniforms, time: u32) -> (Color, u32) {
   let x = fragment.vertex_position.x;
   let y = fragment.vertex_position.y;
   let z = fragment.vertex_position.z;
@@ -339,10 +340,10 @@ fn urano_shader(fragment: &Fragment, uniforms: &Uniforms, time: u32) -> Color {
   let ambient = 0.3; // Intensidad ambiental
   let lit_color = varied_color * (ambient + (1.0 - ambient) * diffuse); // Combinación de iluminación
 
-  lit_color
+  (lit_color, 0)
 }
 
-fn saturn_shader(fragment: &Fragment) -> Color {
+fn saturn_shader(fragment: &Fragment) -> (Color, u32) {
   // Normalizar la latitud de -1 a 1 a un rango de 0 a 1
   let latitude = (fragment.vertex_position.y + 1.0) * 0.5;
 
@@ -379,10 +380,10 @@ fn saturn_shader(fragment: &Fragment) -> Color {
   let ambient_color = color * ambient_intensity;
   let diffuse_color = color * diffuse;
 
-  ambient_color + diffuse_color
+  (ambient_color + diffuse_color, 0)
 }
 
-pub fn ring_shader(fragment: &Fragment) -> Color {
+pub fn ring_shader(fragment: &Fragment) -> (Color, u32) {
   // Coordenadas en 2D para determinar la distancia desde el centro de los anillos
   let position = Vec2::new(fragment.vertex_position.x, fragment.vertex_position.z); // Usar X y Z para planos
   let distance_from_center = position.magnitude(); // Calcular la distancia desde el centro
@@ -413,5 +414,12 @@ pub fn ring_shader(fragment: &Fragment) -> Color {
   // Modificar la opacidad para dar un efecto de transparencia a los anillos
   let final_color = color * smooth_edge;
 
-  final_color
+  (final_color, 0)
+}
+
+fn sun_shader() -> (Color, u32) {
+  let base_color = Color::from_float(1.0, 0.9, 0.5); // Color amarillo/dorado para el Sol
+  let emission = 100; // Máxima emisión para el efecto de glow/bloom
+
+  (base_color, emission)
 }
