@@ -260,9 +260,9 @@ fn main() {
 
     // camera parameters
     let mut camera = Camera::new(
-        Vec3::new(0.0, 0.0, 10.0),
+        Vec3::new(0.0, 5.0, 10.0),
         Vec3::new(0.0, 0.0, 0.0),
-        Vec3::new(0.0, 1.0, 0.0)
+        Vec3::new(0.0, 10.0, 0.0)
     );
 
     let obj = Obj::load("assets/models/sphere.obj").expect("Failed to load obj");
@@ -279,7 +279,7 @@ fn main() {
     // Lunas de los planetas rocosos
     let moon_scale = 0.5; // Escala de la luna respecto al planeta
     let moon_distance = 2.5; // Distancia de la luna al planeta
-    let moon_orbit_speed = 0.003; // Velocidad orbital de la luna
+    let moon_orbit_speed = 0.001; // Velocidad orbital de la luna
 
     let projection_matrix = create_perspective_matrix(window_width as f32, window_height as f32);
     let viewport_matrix = create_viewport_matrix(framebuffer_width as f32, framebuffer_height as f32);
@@ -298,6 +298,7 @@ fn main() {
     let mut current_planet = 1; 
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
+
         let delta_time = last_frame_time.elapsed();
         last_frame_time = Instant::now();
         time += delta_time.as_millis() as u32;
